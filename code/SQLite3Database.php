@@ -935,10 +935,18 @@ class SQLite3Database extends SS_Database {
 			$objects[] = new $record['ClassName']($record);
 
 		if(isset($objects)) $doSet = new DataObjectSet($objects);
-			else $doSet = new DataObjectSet();
+		else $doSet = new DataObjectSet();
 
-		$doSet->setPageLimits($start, $pageLength, $totalCount);
-		return $doSet;
+		if(class_exists('PaginatedList')) {
+			$list = new PaginatedList($doSet);
+			$list->setPageStart($start);
+			$list->setPageLEngth($pageLength);
+			$list->setTotalItems($totalCount);
+			return $list;
+		} else {
+			$doSet->setPageLimits($start, $pageLength, $totalCount);
+			return $doSet;
+		}
 	}
 
 	/*
