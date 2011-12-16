@@ -901,8 +901,14 @@ class SQLite3Database extends SS_Database {
 
 		// Generate initial queries and base table names
 		$baseClasses = array('SiteTree' => '', 'File' => '');
+		$queries = array();
 		foreach($classesToSearch as $class) {
-			$queries[$class] = singleton($class)->extendedSQL($notMatch . $match[$class] . $extraFilters[$class], "");
+			// SS 2.4 and 3.0
+			if(class_exists('DataList')) {
+				$queries[$class] = DataList::create($class)->where($notMatch . $match[$class] . $extraFilters[$class], "")->dataQuery()->query();
+			} else {
+				$queries[$class] = singleton($class)->extendedSQL($notMatch . $match[$class] . $extraFilters[$class], "");
+			}
 			$baseClasses[$class] = reset($queries[$class]->from);
 		}
 
@@ -934,16 +940,18 @@ class SQLite3Database extends SS_Database {
 		foreach($records as $record)
 			$objects[] = new $record['ClassName']($record);
 
-		if(isset($objects)) $doSet = new DataObjectSet($objects);
-		else $doSet = new DataObjectSet();
-
+		// SS3
 		if(class_exists('PaginatedList')) {
+			if(isset($objects)) $doSet = new ArrayList($objects);
+			else $doSet = new ArrayList();
 			$list = new PaginatedList($doSet);
 			$list->setPageStart($start);
 			$list->setPageLEngth($pageLength);
 			$list->setTotalItems($totalCount);
 			return $list;
 		} else {
+			if(isset($objects)) $doSet = new DataObjectSet($objects);
+			else $doSet = new DataObjectSet();
 			$doSet->setPageLimits($start, $pageLength, $totalCount);
 			return $doSet;
 		}
