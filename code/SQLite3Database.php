@@ -91,7 +91,7 @@ class SQLite3Database extends SS_Database {
 		$this->dbConn = new SQLite3($file, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $parameters['key']);
 		if(method_exists('SQLite3', 'busyTimeout')) $this->dbConn->busyTimeout(60000);
 
-		//By virtue of getting here, the connection is active:
+		// By virtue of getting here, the connection is active:
 		$this->active=true;
 		$this->database = $dbName;
 
@@ -105,7 +105,7 @@ class SQLite3Database extends SS_Database {
 		if(empty(self::$default_pragma['locking_mode'])) {
 			self::$default_pragma['locking_mode'] = $this->pragma('locking_mode');
 		}
-
+		
 		return true;
 	}
 
@@ -1046,6 +1046,7 @@ class SQLite3Database extends SS_Database {
 	public function sqlQueryToString(SQLQuery $sqlQuery) {
 		if (!$sqlQuery->from) return '';
 		$distinct = $sqlQuery->distinct ? "DISTINCT " : "";
+		
 		if($sqlQuery->delete) {
 			$text = "DELETE ";
 		} else if($sqlQuery->select) {
@@ -1053,10 +1054,17 @@ class SQLite3Database extends SS_Database {
 		}
 		if($sqlQuery->from) $text .= " FROM " . implode(" ", $sqlQuery->from);
 
-		if($sqlQuery->where) $text .= " WHERE (" . $sqlQuery->getFilter(). ")";
-		if($sqlQuery->groupby) $text .= " GROUP BY " . implode(", ", $sqlQuery->groupby);
-		if($sqlQuery->having) $text .= " HAVING ( " . implode(" ) AND ( ", $sqlQuery->having) . " )";
-		if($sqlQuery->orderby) $text .= " ORDER BY " . $this->orderMoreSpecifically($sqlQuery->select,$sqlQuery->orderby);
+		if($sqlQuery->where) 
+			$text .= " WHERE (" . $sqlQuery->prepareSelect(). ")";
+			
+		if($sqlQuery->groupby) 
+			$text .= " GROUP BY " .$sqlQuery->prepareGroupBy();
+		
+		if($sqlQuery->having) 
+			$text .= " HAVING ( " . $sqlQuery->prepareHaving() . " )";
+			
+		if($sqlQuery->orderby) 
+			$text .= " ORDER BY " . $this->orderMoreSpecifically($sqlQuery->select, $sqlQuery->prepareOrderBy());
 
 		if($sqlQuery->limit) {
 			$limit = $sqlQuery->limit;
