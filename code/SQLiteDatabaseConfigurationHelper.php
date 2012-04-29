@@ -29,11 +29,12 @@ class SQLiteDatabaseConfigurationHelper implements DatabaseConfigurationHelper {
 	 */
 	public function requireDatabaseServer($databaseConfig) {
 		$path = $databaseConfig['path'];
-		
+		$error = '';
+
 		if(!$path) {
 			$success = false;
 			$error = 'No database path provided';
-		} 
+		}
 		// check if parent folder is writeable
 		elseif(is_writable(dirname($path))) {
 			$success = true;
