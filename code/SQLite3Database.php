@@ -1053,10 +1053,36 @@ class SQLite3Database extends SS_Database {
 		}
 		if($sqlQuery->from) $text .= " FROM " . implode(" ", $sqlQuery->from);
 
-		if($sqlQuery->where) $text .= " WHERE (" . $sqlQuery->getFilter(). ")";
-		if($sqlQuery->groupby) $text .= " GROUP BY " . implode(", ", $sqlQuery->groupby);
-		if($sqlQuery->having) $text .= " HAVING ( " . implode(" ) AND ( ", $sqlQuery->having) . " )";
-		if($sqlQuery->orderby) $text .= " ORDER BY " . $this->orderMoreSpecifically($sqlQuery->select,$sqlQuery->orderby);
+		// method_exists is done here for legacy reasons, so we can use this on SS 2.4 and 3.0
+		if($sqlQuery->where) {
+			if(method_exists($sqlQuery, 'prepareSelect')) {
+				$text .= ' WHERE (' . $sqlQuery->prepareSelect() . ')';
+			} else {
+				$text .= ' WHERE (' . $sqlQuery->getFilter() . ')';
+			}
+		}
+		if($sqlQuery->groupby) {
+			if(method_exists($sqlQuery, 'prepareGroupBy')) {
+				$text .= ' GROUP BY ' . $sqlQuery->prepareGroupBy();
+			} else {
+				$text .= ' GROUP BY ' . implode(', ', $sqlQuery->groupby);
+			}
+		}
+		if($sqlQuery->having) {
+			if(method_exists($sqlQuery, 'prepareHaving')) {
+				$text .= ' HAVING ( ' . $sqlQuery->prepareHaving() . ' )';
+			} else {
+				$text .= ' HAVING ( ' . implode(' ) AND ( ', $sqlQuery->having) . ' )';
+			}
+		}
+		if($sqlQuery->orderby) {
+			if(method_exists($sqlQuery, 'prepareOrderBy')) {
+				$text .= ' ORDER BY ' . $sqlQuery->prepareOrderBy();
+			} else {
+				// orderMoreSpecifically isn't needed in SS 3.0, as SQLQuery does this for us instead
+				$text .= ' ORDER BY ' . $this->orderMoreSpecifically($sqlQuery->select, $sqlQuery->orderby);
+			}
+		}
 
 		if($sqlQuery->limit) {
 			$limit = $sqlQuery->limit;
