@@ -1187,25 +1187,14 @@ class SQLite3Query extends SS_Query {
 	 */
 	public function numRecords() {
 		$c=0;
-		while(@$this->handle->fetchArray()) $c++;
+		while($this->handle->fetchArray()) $c++;
 		$this->handle->reset();
 		return $c;
 	}
 
 	public function nextRecord() {
-		// Coalesce rather than replace common fields.
-		if($data = @$this->handle->fetchArray(SQLITE3_NUM)) {
-			foreach($data as $columnIdx => $value) {
-				if(preg_match('/^"([a-z0-9_]+)"\."([a-z0-9_]+)"$/i', $this->handle->columnName($columnIdx), $matches)) $columnName = $matches[2];
-				else if(preg_match('/^"([a-z0-9_]+)"$/i', $this->handle->columnName($columnIdx), $matches)) $columnName = $matches[1];
-				else $columnName = trim($this->handle->columnName($columnIdx),"\"' \t");
-				// $value || !$ouput[$columnName] means that the *last* occurring value is shown
-				// !$ouput[$columnName] means that the *first* occurring value is shown
-				if(isset($value) || !isset($output[$columnName])) {
-					$output[$columnName] = is_null($value) ? null : (string)$value;
-				}
-			}
-			return $output;
+		if($data = $this->handle->fetchArray(SQLITE3_ASSOC)) {
+			return $data;
 		} else {
 			return false;
 		}
