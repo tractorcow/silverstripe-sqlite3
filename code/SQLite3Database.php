@@ -903,27 +903,58 @@ class SQLite3Database extends SS_Database {
 		$baseClasses = array('SiteTree' => '', 'File' => '');
 		$queries = array();
 		foreach($classesToSearch as $class) {
-			// SS 2.4 and 3.0
-			if(class_exists('DataList')) {
-				$queries[$class] = DataList::create($class)->where($notMatch . $match[$class] . $extraFilters[$class], "")->dataQuery()->query();
-			} else {
-				$queries[$class] = singleton($class)->extendedSQL($notMatch . $match[$class] . $extraFilters[$class], "");
-			}
-			$baseClasses[$class] = reset($queries[$class]->from);
+			$queries[$class] = DataList::create($class)->where($notMatch . $match[$class] . $extraFilters[$class], "")->dataQuery()->query();
+			$fromArr = $queries[$class]->getFrom();
+			$baseClasses[$class] = reset($fromArr);
 		}
 
 		// Make column selection lists
 		$select = array(
-			'SiteTree' => array("\"ClassName\"","\"SiteTree\".\"ID\"","\"ParentID\"",        "\"Title\"","\"URLSegment\"",        "\"Content\"","\"LastEdited\"","\"Created\"","NULL AS \"Filename\"", "NULL AS \"Name\"", "\"CanViewType\"", "$relevance[SiteTree] AS Relevance"),
-			'File'     => array("\"ClassName\"","\"File\".\"ID\"",    "NULL AS \"ParentID\"","\"Title\"","NULL AS \"URLSegment\"","\"Content\"","\"LastEdited\"","\"Created\"","\"Filename\"",         "\"Name\"", "NULL AS \"CanViewType\"", "$relevance[File] AS Relevance"),
+			'SiteTree' => array(
+				"\"ClassName\"",
+				"\"ID\"",
+				"\"ParentID\"",
+				"\"Title\"",
+				"\"URLSegment\"",
+				"\"Content\"",
+				"\"LastEdited\"",
+				"\"Created\"",
+				"NULL AS \"Filename\"",
+				"NULL AS \"Name\"",
+				"\"CanViewType\"",
+				"$relevance[SiteTree] AS Relevance"
+			),
+			'File' => array(
+				"\"ClassName\"",
+				"\"ID\"",
+				"NULL AS \"ParentID\"",
+				"\"Title\"",
+				"NULL AS \"URLSegment\"",
+				"\"Content\"",
+				"\"LastEdited\"",
+				"\"Created\"",
+				"\"Filename\"",
+				"\"Name\"",
+				"NULL AS \"CanViewType\"",
+				"$relevance[File] AS Relevance"
+			)
 		);
 
 		// Process queries
 		foreach($classesToSearch as $class) {
 			// There's no need to do all that joining
-			$queries[$class]->from = array(str_replace('`','',$baseClasses[$class]) => $baseClasses[$class]);
-			$queries[$class]->select = $select[$class];
-			$queries[$class]->orderby = null;
+			$queries[$class]->setFrom($baseClasses[$class]);
+
+			$queries[$class]->setSelect(array());
+			foreach($select[$class] as $clause) {
+				if(preg_match('/^(.*) +AS +"?([^"]*)"?/i', $clause, $matches)) {
+					$queries[$class]->selectField($matches[1], $matches[2]);
+				} else {
+					$queries[$class]->selectField(str_replace('"', '', $clause));
+				}
+			}
+
+			$queries[$class]->setOrderBy(array());
 		}
 
 		// Combine queries
@@ -933,28 +964,22 @@ class SQLite3Database extends SS_Database {
 			$querySQLs[] = $query->sql();
 			$totalCount += $query->unlimitedRowCount();
 		}
+
 		$fullQuery = implode(" UNION ", $querySQLs) . " ORDER BY $sortBy LIMIT $limit";
 		// Get records
 		$records = DB::query($fullQuery);
 
-		foreach($records as $record)
+		foreach($records as $record) {
 			$objects[] = new $record['ClassName']($record);
-
-		// SS3
-		if(class_exists('PaginatedList')) {
-			if(isset($objects)) $doSet = new ArrayList($objects);
-			else $doSet = new ArrayList();
-			$list = new PaginatedList($doSet);
-			$list->setPageStart($start);
-			$list->setPageLEngth($pageLength);
-			$list->setTotalItems($totalCount);
-			return $list;
-		} else {
-			if(isset($objects)) $doSet = new DataObjectSet($objects);
-			else $doSet = new DataObjectSet();
-			$doSet->setPageLimits($start, $pageLength, $totalCount);
-			return $doSet;
 		}
+
+		if(isset($objects)) $doSet = new ArrayList($objects);
+		else $doSet = new ArrayList();
+		$list = new PaginatedList($doSet);
+		$list->setPageStart($start);
+		$list->setPageLEngth($pageLength);
+		$list->setTotalItems($totalCount);
+		return $list;
 	}
 
 	/*
