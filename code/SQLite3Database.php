@@ -76,18 +76,17 @@ class SQLite3Database extends SS_Database {
 		$file = $parameters['path'] . '/' . $dbName;
 
 		// use the very lightspeed SQLite In-Memory feature for testing
-		if(SapphireTest::using_temp_db() && $parameters['memory']) {
+		if(isset($parameters['memory']) && $parameters['memory']) {
 			$file = ':memory:';
 			$this->lives_in_memory = true;
 		} else {
 			$this->lives_in_memory = false;
+			if(!file_exists($parameters['path'])) {
+				SQLiteDatabaseConfigurationHelper::create_db_dir($parameters['path']);
+				SQLiteDatabaseConfigurationHelper::secure_db_dir($parameters['path']);
+			}
 		}
 		
-		if(!file_exists($parameters['path'])) {
-			SQLiteDatabaseConfigurationHelper::create_db_dir($parameters['path']);
-			SQLiteDatabaseConfigurationHelper::secure_db_dir($parameters['path']);
-		}
-
 		$this->dbConn = new SQLite3($file, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $parameters['key']);
 		if(method_exists('SQLite3', 'busyTimeout')) $this->dbConn->busyTimeout(60000);
 
