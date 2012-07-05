@@ -527,6 +527,7 @@ class SQLite3Database extends SS_Database {
 			foreach(DB::query('PRAGMA index_info("' . $index["name"] . '")') as $details) $list[] = $details['name'];
 			$indexList[$index["name"]] = implode(',', $list);
 		}
+		foreach($indexList as $name => $val) $indexList[$name] = "\"$val\"";
 
 		return $indexList;
 	}
