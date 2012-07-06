@@ -124,6 +124,10 @@ class SQLite3Database extends SS_Database {
 		return true;
 	}
 
+	public function supportsTimezoneOverride() {
+		return false;
+	}
+
 	/**
 	 * Get the version of SQLite3.
 	 * @return float
