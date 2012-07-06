@@ -429,6 +429,7 @@ class SQLite3Database extends SS_Database {
 				$newColsSpec[] = "\"" . (($name == $oldName) ? $newName : $name) . "\" $spec";
 			}
 
+			// SQLite doesn't support direct renames through ALTER TABLE
 			$queries = array(
 				"BEGIN TRANSACTION",
 				"CREATE TABLE \"{$tableName}_renamefield_{$oldName}\" (" . implode(',', $newColsSpec) . ")",
@@ -438,15 +439,21 @@ class SQLite3Database extends SS_Database {
 				"COMMIT"
 			);
 
-			$indexList = $this->indexList($tableName);
+			// Remember original indexes
+			$oldIndexList = $this->indexList($tableName);
+
+			// Then alter the table column
 			foreach($queries as $query) $this->query($query.';');
 
-			foreach($indexList as $indexName => $indexSpec) {
+			// Recreate the indexes
+			foreach($oldIndexList as $indexName => $indexSpec) {
 				$renamedIndexSpec = array();
-				foreach(explode(',', $indexSpec) as $col) $renamedIndexSpec[] = $col == $oldName ? $newName : $col;
+				foreach(explode(',', $indexSpec) as $col) {
+					$col = trim($col, '"'); // remove quotes
+					$renamedIndexSpec[] = ($col == $oldName) ? $newName : $col;
+				}
 				$this->createIndex($tableName, $indexName, implode(',', $renamedIndexSpec));
 			}
-
 		}
 	}
 
