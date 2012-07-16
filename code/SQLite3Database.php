@@ -1198,7 +1198,7 @@ class SQLite3Query extends SS_Query {
 	protected $handle;
 
 	/**
-	 * Hook the result-set given into a Query class, suitable for use by sapphire.
+	 * Hook the result-set given into a Query class, suitable for use by framework.
 	 * @param database The database object that created this query.
 	 * @param handle the internal sqlite3 handle that is points to the resultset.
 	 */
