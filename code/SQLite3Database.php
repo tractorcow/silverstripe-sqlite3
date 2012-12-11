@@ -538,7 +538,16 @@ class SQLite3Database extends SS_Database {
 			foreach(DB::query('PRAGMA index_info("' . $index["name"] . '")') as $details) $list[] = $details['name'];
 			$indexList[$index["name"]] = implode(',', $list);
 		}
-		foreach($indexList as $name => $val) $indexList[$name] = "\"$val\"";
+		foreach($indexList as $name => $val) {
+			// Normalize quoting to avoid false positives when checking for index changes
+			// during schema generation
+			$valParts = preg_split('/\s*,\s*/', $val);
+			foreach($valParts as $i => $valPart) {
+				$valParts[$i] = preg_replace('/^"?(.*)"?$/', '$1', $valPart);
+			}
+				
+			$indexList[$name] = '"' . implode('","', $valParts) . '"';
+		}
 
 		return $indexList;
 	}
