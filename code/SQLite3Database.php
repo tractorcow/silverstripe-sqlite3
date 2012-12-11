@@ -1077,6 +1077,37 @@ class SQLite3Database extends SS_Database {
 	}
 
 	/**
+	 * Generate a WHERE clause for text matching.
+	 * 
+	 * @param String $field Quoted field name
+	 * @param String $value Escaped search. Can include percentage wildcards.
+	 * @param boolean $exact Exact matches or wildcard support.
+	 * @param boolean $negate Negate the clause.
+	 * @param boolean $caseSensitive Enforce case sensitivity if TRUE or FALSE.
+	 *                               Stick with default collation if set to NULL.
+	 * @return String SQL
+	 */
+	public function comparisonClause($field, $value, $exact = false, $negate = false, $caseSensitive = null) {
+		if($exact && !$caseSensitive) {
+			$comp = ($negate) ? '!=' : '=';
+		} else {
+			if($caseSensitive) {
+				// GLOB uses asterisks as wildcards.
+				// Replace them in search string, without replacing escaped percetage signs.
+				$comp = 'GLOB';
+				$value = preg_replace('/^%([^\\\\])/', '*$1', $value);
+				$value = preg_replace('/([^\\\\])%$/', '$1*', $value);
+				$value = preg_replace('/([^\\\\])%/', '$1*', $value);
+			} else {
+				$comp = 'LIKE';
+			}
+			if($negate) $comp = 'NOT ' . $comp;
+		}
+		
+		return sprintf("%s %s '%s'", $field, $comp, $value);
+	}
+
+	/**
 	 * Function to return an SQL datetime expression that can be used with SQLite3
 	 * used for querying a datetime in a certain format
 	 * @param string $date to be formated, can be either 'now', literal datetime like '1973-10-14 10:30:00' or field name, e.g. '"SiteTree"."Created"'
