@@ -3,7 +3,7 @@
 /**
  * A result-set from a SQLite3 database.
  * 
- * @package SQLite3Database
+ * @package SQLite3
  */
 class SQLite3Query extends SS_Query {
 

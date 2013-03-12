@@ -1,20 +1,11 @@
 <?php
 
 /**
- * SQLite connector class.
+ * SQLite database controller class
  * 
  * @package SQLite3
  */
 class SQLite3Database extends SS_Database {
-
-	/*
-	 * This holds the name of the original database
-	 * So if you switch to another for unit tests, you
-	 * can then switch back in order to drop the temp database 
-	 * 
-	 * @var string
-	 */
-	protected $databaseOriginal;
 
 	/*
 	 * This holds the parameters that the original connection was created with,
@@ -32,8 +23,30 @@ class SQLite3Database extends SS_Database {
 	protected $livesInMemory = false;
 
 	public static $default_pragma = array();
+	
 
-	public static $vacuum = true;
+	/**
+	 * Extension used to distinguish between sqllite database files and other files.
+	 * Required to handle multiple databases.
+	 * 
+	 * @return string
+	 */
+	public static function database_extension() {
+        return Config::inst()->get('SQLite3Database', 'database_extension');
+    }
+	
+	/**
+	 * Check if a database name has a valid extension
+	 * 
+	 * @param string $name
+	 * @return boolean
+	 */
+	public static function is_valid_database_name($name) {
+		$extension = self::database_extension();
+		if(empty($extension)) return true;
+		
+		return substr_compare($name, $extension, -strlen($extension), strlen($extension)) === 0;
+	}
 
 	/**
 	 * Connect to a SQLite3 database.
@@ -50,6 +63,12 @@ class SQLite3Database extends SS_Database {
 
 		// Ensure database name is set
 		$dbName = $parameters['database'];
+		if(!self::is_valid_database_name($dbName)) {
+			// If not using the correct file extension for database files then the
+			// results of SQLite3SchemaManager::databaseList will be unpredictable
+			$extension = self::database_extension();
+			Deprecation::notice('3.2', "SQLite3Database now expects a database file with extension \"$extension\". Behaviour may be unpredictable otherwise.");
+		}
 
 		// use the very lightspeed SQLite In-Memory feature for testing
 		$this->livesInMemory = !empty($parameters['memory']);
@@ -68,14 +87,25 @@ class SQLite3Database extends SS_Database {
 		$this->connector->connect($parameters);
 		
 		foreach(self::$default_pragma as $pragma => $value) {
-			$this->pragma($pragma, $value);
+			$this->setPragma($pragma, $value);
 		}
 		
 		if(empty(self::$default_pragma['locking_mode'])) {
-			self::$default_pragma['locking_mode'] = $this->pragma('locking_mode');
+			self::$default_pragma['locking_mode'] = $this->getPragma('locking_mode');
 		}
-
-		$this->databaseOriginal = $dbName;
+	}
+	
+	/**
+	 * Retrieve parameters used to connect to this SQLLite database
+	 * 
+	 * @return array
+	 */
+	public function getParameters() {
+		return $this->parameters;
+	}
+	
+	public function getLivesInMemory() {
+		return $this->livesInMemory;
 	}
 
 	/**
@@ -101,29 +131,47 @@ class SQLite3Database extends SS_Database {
 
 	/**
 	 * Execute PRAGMA commands.
-	 * works as getter and setter for connection params
 	 * 
-	 * @param String pragma name
-	 * @param String optional value to set
-	 * @return String the pragma value
+	 * @param string pragma name
+	 * @param string value to set
 	 */
-	protected function pragma($pragma, $value = null) {
-		if(strlen($value)) {
-			$this->query("PRAGMA $pragma = $value");
-		} else {
-			$value = $this->query("PRAGMA $pragma")->value();
-		}
-
-		return $value;
+	public function setPragma($pragma, $value) {
+		$this->query("PRAGMA $pragma = $value");
+	}
+	
+	/**
+	 * Gets pragma value.
+	 * 
+	 * @param string pragma name
+	 * @return string the pragma value
+	 */
+	public function getPragma($pragma) {
+		return $this->query("PRAGMA $pragma")->value();
 	}
 	
 	public function getDatabaseServer() {
 		return "sqlite";
 	}
 
-	public function selectDatabase($dbname) {
-		// @todo
-		user_error("Not implemented", E_USER_ERROR);
+	public function selectDatabase($name, $create = false, $errorLevel = E_USER_ERROR) {
+		if (!$this->schemaManager->databaseExists($name)) {
+			// Check DB creation permisson
+			if (!$create) {
+				if ($errorLevel !== false) {
+					user_error("Attempted to connect to non-existing database \"$name\"", $errorLevel);
+				}
+				// Unselect database
+				$this->connector->unloadDatabase();
+				return false;
+			}
+			$this->schemaManager->createDatabase($name);
+		}
+		
+		// Reconnect using the existing parameters
+		$parameters = $this->parameters;
+		$parameters['database'] = $name;
+		$this->connect($parameters);
+		return true;
 	}
 
 	function now(){

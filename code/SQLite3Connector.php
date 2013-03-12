@@ -1,7 +1,9 @@
 <?php
 
 /**
+ * SQLite connector class
  * 
+ * @package SQLite3
  */
 class SQLite3Connector extends DBConnector {
 
@@ -18,7 +20,7 @@ class SQLite3Connector extends DBConnector {
 	 * @var SQLite3
 	 */
 	protected $dbConn;
-
+	
 	public function connect($parameters) {
 		$file = $parameters['filepath'];
 		$this->dbConn = new SQLite3($file, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $parameters['key']);
@@ -35,11 +37,11 @@ class SQLite3Connector extends DBConnector {
 	}
 
 	public function getLastError() {
-		
+		return $this->dbConn->lastErrorMsg();
 	}
 
 	public function getSelectedDatabase() {
-		
+		return $this->databaseName;
 	}
 
 	public function getVersion() {
@@ -89,10 +91,14 @@ class SQLite3Connector extends DBConnector {
 	}
 
 	public function selectDatabase($name) {
-		
+        if($name !== $this->databaseName) {
+            user_error("SQLite3Connector can't change databases. Please create a new database connection", E_USER_ERROR);
+		}
+        return true;
 	}
 
 	public function unloadDatabase() {
-		
+		$this->dbConn->close();
+		$this->databaseName = null;
 	}	
 }

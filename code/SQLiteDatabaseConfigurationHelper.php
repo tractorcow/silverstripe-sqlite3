@@ -1,11 +1,12 @@
 <?php
+
 /**
  * This is a helper class for the SS installer.
  * 
  * It does all the specific checking for SQLiteDatabase
  * to ensure that the configuration is setup correctly.
  * 
- * @package sqlite3
+ * @package SQLite3
  */
 class SQLiteDatabaseConfigurationHelper implements DatabaseConfigurationHelper {
 
