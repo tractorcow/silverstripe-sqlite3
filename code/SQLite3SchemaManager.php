@@ -76,11 +76,18 @@ class SQLite3SchemaManager extends DBSchemaManager {
 		return in_array($name, $databases);
 	}
 	
+	/**
+	 * Empties any cached enum values
+	 */
+	public function flushCache() {
+		$this->enum_map = array();
+	}
+	
 	function schemaUpdate($callback) {
 		// Set locking mode
 		$this->database->setPragma('locking_mode', 'EXCLUSIVE');
 		$this->checkAndRepairTable();
-		$this->enum_map = array();
+		$this->flushCache();
 		
 		// Initiate schema update
 		$error = null;
@@ -294,12 +301,19 @@ class SQLite3SchemaManager extends DBSchemaManager {
 	 */
 	public function createIndex($tableName, $indexName, $indexSpec) {
 		$parsedSpec = $this->parseIndexSpec($indexName, $indexSpec);
-		$sqliteSpec = $parsedSpec['value'];
 		$sqliteName = $this->buildSQLiteIndexName($tableName, $indexName);
-		$this->query("CREATE INDEX IF NOT EXISTS \"$sqliteName\" ON \"$tableName\" ($sqliteSpec)");
+		$columns = $parsedSpec['value'];
+		$unique = ($parsedSpec['type'] == 'unique') ? 'UNIQUE' : '';
+		$this->query("CREATE $unique INDEX IF NOT EXISTS \"$sqliteName\" ON \"$tableName\" ($columns)");
 	}
 
 	public function alterIndex($tableName, $indexName, $indexSpec) {
+		
+		// Drop existing index
+		$sqliteName = $this->buildSQLiteIndexName($tableName, $indexName);
+		$this->query("DROP INDEX IF EXISTS \"$sqliteName\"");
+		
+		// Create the index
 		$this->createIndex($tableName, $indexName, $indexSpec);
 	}
 	
@@ -317,6 +331,17 @@ class SQLite3SchemaManager extends DBSchemaManager {
 		return "{$tableName}_{$indexName}";
 	}
 	
+	protected function parseIndexSpec($name, $spec) {
+		$spec = parent::parseIndexSpec($name, $spec);
+		
+		// Only allow index / unique index types
+		if(!in_array($spec['type'], array('index', 'unique'))) {
+			$spec['type'] = 'index';
+		}
+		
+		return $spec;
+	}
+	
 	public function indexKey($table, $index, $spec) {
 		return $this->buildSQLiteIndexName($table, $index);
 	}
@@ -329,6 +354,7 @@ class SQLite3SchemaManager extends DBSchemaManager {
 			
 			// The SQLite internal index name, not the actual Silverstripe name
 			$indexName = $index["name"];
+			$indexType = $index['unique'] ? 'unique' : 'index';
 			
 			// Determine a clean list of column names within this index
 			$list = array();
@@ -339,7 +365,8 @@ class SQLite3SchemaManager extends DBSchemaManager {
 			// Safely encode this spec
 			$indexList[$indexName] = $this->parseIndexSpec($indexName, array(
 				'name' => $indexName,
-				'value' => $this->implodeColumnList($list)
+				'value' => $this->implodeColumnList($list),
+				'type' => $indexType
 			));
 		}
 
@@ -522,7 +549,7 @@ class SQLite3SchemaManager extends DBSchemaManager {
 		return "TEXT";
 	}
 
-	public function IdColumn($asDbValue = false){
+	public function IdColumn($asDbValue = false, $hasAutoIncPK = true){
 		return 'INTEGER PRIMARY KEY AUTOINCREMENT';
 	}
 

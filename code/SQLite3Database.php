@@ -6,6 +6,13 @@
  * @package SQLite3
  */
 class SQLite3Database extends SS_Database {
+	
+	/**
+	 * Database schema manager object
+	 * 
+	 * @var SQLite3SchemaManager
+	 */
+	protected $schemaManager = null;
 
 	/*
 	 * This holds the parameters that the original connection was created with,
@@ -59,7 +66,7 @@ class SQLite3Database extends SS_Database {
 	public function connect($parameters) {
 		//We will store these connection parameters for use elsewhere (ie, unit tests)
 		$this->parameters = $parameters;
-		$this->enum_map = array();
+		$this->schemaManager->flushCache();
 
 		// Ensure database name is set
 		$dbName = $parameters['database'];
@@ -108,11 +115,6 @@ class SQLite3Database extends SS_Database {
 		return $this->livesInMemory;
 	}
 
-	/**
-	 * Returns true if this database supports collations
-	 * TODO: get rid of this?
-	 * @return boolean
-	 */
 	public function supportsCollations() {
 		return true;
 	}
@@ -121,10 +123,6 @@ class SQLite3Database extends SS_Database {
 		return false;
 	}
 
-	/**
-	 * Get the version of SQLite3.
-	 * @return float
-	 */
 	public function getVersion() {
 		return $this->query("SELECT sqlite_version()")->value();
 	}
@@ -195,8 +193,8 @@ class SQLite3Database extends SS_Database {
 	 * @return object DataObjectSet of result pages
 	 */
 	public function searchEngine($classesToSearch, $keywords, $start, $pageLength, $sortBy = "Relevance DESC", $extraFilter = "", $booleanSearch = false, $alternativeFileFilter = "", $invertedMatch = false) {
-		$fileFilter = '';
-		$keywords = Convert::raw2sql(str_replace(array('*','+','-','"','\''),'',$keywords));
+
+		$keywords = $this->escapeString(str_replace(array('*','+','-','"','\''), '', $keywords));
 		$htmlEntityKeywords = htmlentities(utf8_decode($keywords));
 
 		$extraFilters = array('SiteTree' => '', 'File' => '');
@@ -297,15 +295,17 @@ class SQLite3Database extends SS_Database {
 
 		// Combine queries
 		$querySQLs = array();
+		$queryParameters = array();
 		$totalCount = 0;
 		foreach($queries as $query) {
-			$querySQLs[] = $query->sql();
+			$querySQLs[] = $query->sql($parameters);
+			$queryParameters = array_merge($queryParameters, $parameters);
 			$totalCount += $query->unlimitedRowCount();
 		}
 
 		$fullQuery = implode(" UNION ", $querySQLs) . " ORDER BY $sortBy LIMIT $limit";
 		// Get records
-		$records = DB::query($fullQuery);
+		$records = $this->preparedQuery($fullQuery, $queryParameters);
 
 		foreach($records as $record) {
 			$objects[] = new $record['ClassName']($record);
@@ -327,10 +327,7 @@ class SQLite3Database extends SS_Database {
 		return version_compare($this->getVersion(), '3.6', '>=');
 	}
 
-	/*
-	 * This is a quick lookup to discover if the database supports particular extensions
-	 */
-	public function supportsExtensions($extensions=Array('partitions', 'tablespaces', 'clustering')){
+	public function supportsExtensions($extensions = array('partitions', 'tablespaces', 'clustering')){
 
 		if(isset($extensions['partitions']))
 			return true;
@@ -342,67 +339,28 @@ class SQLite3Database extends SS_Database {
 			return false;
 	}
 
-	/**
-	 * @deprecated 1.2 use transactionStart() (method required for 2.4.x)
-	 */
-	public function startTransaction($transaction_mode=false, $session_characteristics=false){
-		$this->transactionStart($transaction_mode, $session_characteristics);
+	public function transactionStart($transaction_mode = false, $session_characteristics = false) {
+		$this->query('BEGIN');
 	}
 
-	/*
-	 * Start a prepared transaction
-	 */
-	public function transactionStart($transaction_mode=false, $session_characteristics=false){
-		DB::query('BEGIN');
+	public function transactionSavepoint($savepoint) {
+		$this->query("SAVEPOINT \"$savepoint\"");
 	}
 
-	/*
-	 * Create a savepoint that you can jump back to if you encounter problems
-	 */
-	public function transactionSavepoint($savepoint){
-		DB::query("SAVEPOINT \"$savepoint\"");
-	}
-
-	/*
-	 * Rollback or revert to a savepoint if your queries encounter problems
-	 * If you encounter a problem at any point during a transaction, you may
-	 * need to rollback that particular query, or return to a savepoint
-	 */
-	public function transactionRollback($savepoint=false){
+	public function transactionRollback($savepoint = false){
 
 		if($savepoint) {
-			DB::query("ROLLBACK TO $savepoint;");
+			$this->query("ROLLBACK TO $savepoint;");
 		} else {
-			DB::query('ROLLBACK;');
+			$this->query('ROLLBACK;');
 		}
 	}
-
-	/**
-	 * @deprecated 1.2 use transactionEnd() (method required for 2.4.x)
-	 */
-	public function endTransaction(){
-		$this->transactionEnd();
+	
+	public function transactionEnd($chain = false){
+		$this->query('COMMIT;');
 	}
 
-	/*
-	 * Commit everything inside this transaction so far
-	 */
-	public function transactionEnd(){
-		DB::query('COMMIT;');
-	}
-
-	/**
-	 * Generate a WHERE clause for text matching.
-	 * 
-	 * @param String $field Quoted field name
-	 * @param String $value Escaped search. Can include percentage wildcards.
-	 * @param boolean $exact Exact matches or wildcard support.
-	 * @param boolean $negate Negate the clause.
-	 * @param boolean $caseSensitive Enforce case sensitivity if TRUE or FALSE.
-	 *                               Stick with default collation if set to NULL.
-	 * @return String SQL
-	 */
-	public function comparisonClause($field, $value, $exact = false, $negate = false, $caseSensitive = null) {
+	public function comparisonClause($field, $value, $exact = false, $negate = false, $caseSensitive = null, $parameterised = false) {
 		if($exact && !$caseSensitive) {
 			$comp = ($negate) ? '!=' : '=';
 		} else {
@@ -419,23 +377,13 @@ class SQLite3Database extends SS_Database {
 			if($negate) $comp = 'NOT ' . $comp;
 		}
 		
-		return sprintf("%s %s '%s'", $field, $comp, $value);
+		if($parameterised) {
+			return sprintf("%s %s ?", $field, $comp);
+		} else {
+			return sprintf("%s %s '%s'", $field, $comp, $value);
+		}
 	}
-
-	/**
-	 * Function to return an SQL datetime expression that can be used with SQLite3
-	 * used for querying a datetime in a certain format
-	 * @param string $date to be formated, can be either 'now', literal datetime like '1973-10-14 10:30:00' or field name, e.g. '"SiteTree"."Created"'
-	 * @param string $format to be used, supported specifiers:
-	 * %Y = Year (four digits)
-	 * %m = Month (01..12)
-	 * %d = Day (01..31)
-	 * %H = Hour (00..23)
-	 * %i = Minutes (00..59)
-	 * %s = Seconds (00..59)
-	 * %U = unix timestamp, can only be used on it's own
-	 * @return string SQL datetime expression to query for a formatted datetime
-	 */
+	
 	function formattedDatetimeClause($date, $format) {
 
 		preg_match_all('/%(.)/', $format, $matches);
@@ -462,21 +410,6 @@ class SQLite3Database extends SS_Database {
 		return "strftime('$format', $date$modifier)";
 	}
 	
-	/**
-	 * Function to return an SQL datetime expression that can be used with SQLite3
-	 * used for querying a datetime addition
-	 * @param string $date, can be either 'now', literal datetime like '1973-10-14 10:30:00' or field name, e.g. '"SiteTree"."Created"'
-	 * @param string $interval to be added, use the format [sign][integer] [qualifier], e.g. -1 Day, +15 minutes, +1 YEAR
-	 * supported qualifiers:
-	 * - years
-	 * - months
-	 * - days
-	 * - hours
-	 * - minutes
-	 * - seconds
-	 * This includes the singular forms as well
-	 * @return string SQL datetime expression to query for a datetime (YYYY-MM-DD hh:mm:ss) which is the result of the addition
-	 */
 	function datetimeIntervalClause($date, $interval) {
 		$modifiers = array();
 		if($date == 'now') $modifiers[] = 'localtime';
@@ -491,13 +424,6 @@ class SQLite3Database extends SS_Database {
 		return "datetime($date$modifier, '$interval')";
 	}
 
-	/**
-	 * Function to return an SQL datetime expression that can be used with SQLite3
-	 * used for querying a datetime substraction
-	 * @param string $date1, can be either 'now', literal datetime like '1973-10-14 10:30:00' or field name, e.g. '"SiteTree"."Created"'
-	 * @param string $date2 to be substracted of $date1, can be either 'now', literal datetime like '1973-10-14 10:30:00' or field name, e.g. '"SiteTree"."Created"'
-	 * @return string SQL datetime expression to query for the interval between $date1 and $date2 in seconds which is the result of the substraction
-	 */
 	function datetimeDifferenceClause($date1, $date2) {
 
 		$modifiers1 = array();
