@@ -8,23 +8,25 @@
 class SQLite3Query extends SS_Query {
 
 	/**
-	 * The SQLite3Database object that created this result set.
-	 * @var SQLite3Database
+	 * The SQLite3Connector object that created this result set.
+	 * 
+	 * @var SQLite3Connector
 	 */
 	protected $database;
 
 	/**
 	 * The internal sqlite3 handle that points to the result set.
-	 * @var resource
+	 * 
+	 * @var SQLite3Result
 	 */
 	protected $handle;
 
 	/**
 	 * Hook the result-set given into a Query class, suitable for use by framework.
-	 * @param database The database object that created this query.
-	 * @param handle the internal sqlite3 handle that is points to the resultset.
+	 * @param SQLite3Connector $database The database object that created this query.
+	 * @param SQLite3Result $handle the internal sqlite3 handle that is points to the resultset.
 	 */
-	public function __construct(SQLite3Database $database, $handle) {
+	public function __construct(SQLite3Connector $database, SQLite3Result $handle) {
 		$this->database = $database;
 		$this->handle = $handle;
 	}

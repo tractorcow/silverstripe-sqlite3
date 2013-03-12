@@ -359,6 +359,10 @@ class SQLite3Database extends SS_Database {
 	public function transactionEnd($chain = false){
 		$this->query('COMMIT;');
 	}
+	
+	public function clearTable($table) {
+		$this->query("DELETE FROM \"$table\"");
+	}
 
 	public function comparisonClause($field, $value, $exact = false, $negate = false, $caseSensitive = null, $parameterised = false) {
 		if($exact && !$caseSensitive) {

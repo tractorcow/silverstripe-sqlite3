@@ -209,66 +209,71 @@ class SQLite3SchemaManager extends DBSchemaManager {
 			$fieldSpec = preg_replace('/\snot null\s/i', ' NOT NULL ON CONFLICT REPLACE ', $fieldSpec);
 		}
 
-		if(array_key_exists($fieldName, $oldFieldList)) {
+		// Skip non-existing columns
+		if(!array_key_exists($fieldName, $oldFieldList)) return;
 
-			foreach($oldFieldList as $name => $spec) {
-				$newColsSpec[] = "\"$name\" " . ($name == $fieldName ? $fieldSpec : $spec);
-			}
+		// Update field spec
+		$newColsSpec = array();
+		foreach($oldFieldList as $name => $oldSpec) {
+			$newColsSpec[] = "\"$name\" " . ($name == $fieldName ? $fieldSpec : $oldSpec);
+		}
 
-			$queries = array(
-				"BEGIN TRANSACTION",
-				"CREATE TABLE \"{$tableName}_alterfield_{$fieldName}\"(" . implode(',', $newColsSpec) . ")",
-				"INSERT INTO \"{$tableName}_alterfield_{$fieldName}\" SELECT {$fieldNameList} FROM \"$tableName\"",
-				"DROP TABLE \"$tableName\"",
-				"ALTER TABLE \"{$tableName}_alterfield_{$fieldName}\" RENAME TO \"$tableName\"",
-				"COMMIT"
-			);
+		$queries = array(
+			"BEGIN TRANSACTION",
+			"CREATE TABLE \"{$tableName}_alterfield_{$fieldName}\"(" . implode(',', $newColsSpec) . ")",
+			"INSERT INTO \"{$tableName}_alterfield_{$fieldName}\" SELECT {$fieldNameList} FROM \"$tableName\"",
+			"DROP TABLE \"$tableName\"",
+			"ALTER TABLE \"{$tableName}_alterfield_{$fieldName}\" RENAME TO \"$tableName\"",
+			"COMMIT"
+		);
 
-			$indexList = $this->indexList($tableName);
-			foreach($queries as $query) $this->query($query.';');
+		// Remember original indexes
+		$indexList = $this->indexList($tableName);
+		
+		// Then alter the table column
+		foreach($queries as $query) $this->query($query.';');
 
-			foreach($indexList as $indexName => $indexSpec) {
-				$this->createIndex($tableName, $indexName, $indexSpec);
-			}
+		// Recreate the indexes
+		foreach($indexList as $indexName => $indexSpec) {
+			$this->createIndex($tableName, $indexName, $indexSpec);
 		}
 	}
 
 	public function renameField($tableName, $oldName, $newName) {
 		$oldFieldList = $this->fieldList($tableName);
+
+		// Skip non-existing columns
+		if(!array_key_exists($oldName, $oldFieldList)) return;
+		
+		// Determine column mappings
 		$oldCols = array();
+		$newColsSpec = array();
+		foreach($oldFieldList as $name => $spec) {
+			$oldCols[] = "\"$name\"" . (($name == $oldName) ? " AS $newName" : '');
+			$newColsSpec[] = "\"" . (($name == $oldName) ? $newName : $name) . "\" $spec";
+		}
 
-		if(array_key_exists($oldName, $oldFieldList)) {
-			foreach($oldFieldList as $name => $spec) {
-				$oldCols[] = "\"$name\"" . (($name == $oldName) ? " AS $newName" : '');
-				$newCols[] = "\"". (($name == $oldName) ? $newName : $name). "\"";
-				$newColsSpec[] = "\"" . (($name == $oldName) ? $newName : $name) . "\" $spec";
-			}
+		// SQLite doesn't support direct renames through ALTER TABLE
+		$queries = array(
+			"BEGIN TRANSACTION",
+			"CREATE TABLE \"{$tableName}_renamefield_{$oldName}\" (" . implode(',', $newColsSpec) . ")",
+			"INSERT INTO \"{$tableName}_renamefield_{$oldName}\" SELECT " . implode(',', $oldCols) . " FROM \"$tableName\"",
+			"DROP TABLE \"$tableName\"",
+			"ALTER TABLE \"{$tableName}_renamefield_{$oldName}\" RENAME TO \"$tableName\"",
+			"COMMIT"
+		);
 
-			// SQLite doesn't support direct renames through ALTER TABLE
-			$queries = array(
-				"BEGIN TRANSACTION",
-				"CREATE TABLE \"{$tableName}_renamefield_{$oldName}\" (" . implode(',', $newColsSpec) . ")",
-				"INSERT INTO \"{$tableName}_renamefield_{$oldName}\" SELECT " . implode(',', $oldCols) . " FROM \"$tableName\"",
-				"DROP TABLE \"$tableName\"",
-				"ALTER TABLE \"{$tableName}_renamefield_{$oldName}\" RENAME TO \"$tableName\"",
-				"COMMIT"
-			);
+		// Remember original indexes
+		$oldIndexList = $this->indexList($tableName);
 
-			// Remember original indexes
-			$oldIndexList = $this->indexList($tableName);
+		// Then alter the table column
+		foreach($queries as $query) $this->query($query.';');
 
-			// Then alter the table column
-			foreach($queries as $query) $this->query($query.';');
-
-			// Recreate the indexes
-			foreach($oldIndexList as $indexName => $indexSpec) {
-				$renamedIndexSpec = array();
-				foreach(explode(',', $indexSpec) as $col) {
-					$col = trim($col, '"'); // remove quotes
-					$renamedIndexSpec[] = ($col == $oldName) ? $newName : $col;
-				}
-				$this->createIndex($tableName, $indexName, implode(',', $renamedIndexSpec));
-			}
+		// Recreate the indexes
+		foreach($oldIndexList as $indexName => $indexSpec) {
+			// Rename columns to new columns
+			$indexSpec['value'] = preg_replace("/\"$oldName\"/i", "\"$newName\"", $indexSpec['value']);
+			$this->createIndex($tableName, $indexName, $indexSpec);
 		}
 	}
 
