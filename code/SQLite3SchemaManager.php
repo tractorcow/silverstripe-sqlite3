@@ -571,7 +571,7 @@ class SQLite3SchemaManager extends DBSchemaManager {
 	 * @return array
 	 */
 	public function enumValuesForField($tableName, $fieldName) {
-		$tablefield = $values['table'] . '.' . $values['name'];
+		$tablefield = "$tableName.$fieldName";
 		
 		// Check already cached values for this field
 		if(!empty($this->enum_map[$tablefield])) {
