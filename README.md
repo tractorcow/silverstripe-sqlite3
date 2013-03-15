@@ -14,15 +14,13 @@ SilverStripe 3.0 or newer
 
 Installation
 ------------
-download, unzip and copy the sqlite3 folder to your project root so that it becomes a sibling of cms, sapphire and co.
+Download, unzip and copy the sqlite3 folder to your project root so that it becomes a sibling of `framework/`.
 
-either use the installer to automatically install SQLite or add this to your _config.php (right after "require_once("conf/ConfigureFromEnv.php");" if you are using _ss_environment.php)
+Either use the installer to automatically install SQLite or add this to your _config.php (right after "require_once("conf/ConfigureFromEnv.php");" if you are using _ss_environment.php)
 
 	$databaseConfig['type'] = 'SQLiteDatabase';
 
-you are done!
-
-make sure the webserver has sufficient privileges to write to that folder and that it is protected from external access.
+Make sure the webserver has sufficient privileges to write to that folder and that it is protected from external access.
 
 
 Sample mysite/_config.php
