@@ -91,7 +91,7 @@ class SQLite3Database extends SS_Database {
 		}
 		$parameters['filepath'] = $file;
 		
-		$this->connector->connect($parameters);
+		$this->connector->connect($parameters, true);
 		
 		foreach(self::$default_pragma as $pragma => $value) {
 			$this->setPragma($pragma, $value);
@@ -121,10 +121,6 @@ class SQLite3Database extends SS_Database {
 
 	public function supportsTimezoneOverride() {
 		return false;
-	}
-
-	public function getVersion() {
-		return $this->query("SELECT sqlite_version()")->value();
 	}
 
 	/**

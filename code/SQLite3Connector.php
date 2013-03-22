@@ -21,7 +21,7 @@ class SQLite3Connector extends DBConnector {
 	 */
 	protected $dbConn;
 	
-	public function connect($parameters) {
+	public function connect($parameters, $selectDB = false) {
 		$file = $parameters['filepath'];
 		$this->dbConn = new SQLite3($file, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $parameters['key']);
 		$this->dbConn->busyTimeout(60000);
