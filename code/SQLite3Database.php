@@ -29,7 +29,17 @@ class SQLite3Database extends SS_Database {
 	 */
 	protected $livesInMemory = false;
 
-	public static $default_pragma = array();
+    /**
+     * List of default pragma values
+     * 
+     * @todo Migrate to SS config
+     *
+     * @var array
+     */
+	public static $default_pragma = array(
+        'encoding' => '"UTF-8"',
+        'locking_mode' => 'NORMAL'
+    );
 	
 
 	/**
@@ -58,7 +68,7 @@ class SQLite3Database extends SS_Database {
 	/**
 	 * Connect to a SQLite3 database.
 	 * @param array $parameters An map of parameters, which should include:
-	 *  - database: The database to connect to
+	 *  - database: The database to connect to, with the correct file extension (.sqlite)
 	 *  - path: the path to the SQLite3 database file
 	 *  - key: the encryption key (needs testing)
 	 *  - memory: use the faster In-Memory database for unit tests
@@ -69,6 +79,9 @@ class SQLite3Database extends SS_Database {
 		$this->schemaManager->flushCache();
 
 		// Ensure database name is set
+        if(empty($parameters['database'])) {
+            $parameters['database'] = 'database' . self::database_extension();
+        }
 		$dbName = $parameters['database'];
 		if(!self::is_valid_database_name($dbName)) {
 			// If not using the correct file extension for database files then the
@@ -82,6 +95,12 @@ class SQLite3Database extends SS_Database {
 		if($this->livesInMemory) {
 			$file = ':memory:';
 		} else {
+            
+            // Ensure path is given
+            if(empty($parameters['path'])) {
+                $parameters['path'] = ASSETS_PATH . '/.sqlitedb';
+            }
+            
 			//assumes that the path to dbname will always be provided:
 			$file = $parameters['path'] . '/' . $dbName;
 			if(!file_exists($parameters['path'])) {
