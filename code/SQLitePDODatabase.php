@@ -18,20 +18,17 @@ class SQLitePDODatabase extends SQLite3Database {
 
 		$dbName = !isset($this->database) ? $parameters['database'] : $dbName=$this->database;
 
-		//assumes that the path to dbname will always be provided:
-		$file = $parameters['path'] . '/' . $dbName;
-
 		// use the very lightspeed SQLite In-Memory feature for testing
-		if(SapphireTest::using_temp_db() && $parameters['memory']) {
+		if((isset($parameters['memory']) && $parameters['memory']) || !isset($parameters['path'])) {
 			$file = ':memory:';
 			$this->lives_in_memory = true;
 		} else {
+			$file = $parameters['path'] . '/' . $dbName;
 			$this->lives_in_memory = false;
-		}
-
-		if(!file_exists($parameters['path'])) {
-			SQLiteDatabaseConfigurationHelper::create_db_dir($parameters['path']);
-			SQLiteDatabaseConfigurationHelper::secure_db_dir($parameters['path']);
+			if(!file_exists($parameters['path'])) {
+				SQLiteDatabaseConfigurationHelper::create_db_dir($parameters['path']);
+				SQLiteDatabaseConfigurationHelper::secure_db_dir($parameters['path']);
+			}
 		}
 
 		$this->dbConn = new PDO("sqlite:$file");
