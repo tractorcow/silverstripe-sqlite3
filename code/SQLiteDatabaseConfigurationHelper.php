@@ -8,7 +8,11 @@
  * 
  * @package SQLite3
  */
-class SQLiteDatabaseConfigurationHelper implements DatabaseConfigurationHelper {
+class SQLiteDatabaseConfigurationHelper extends DatabaseConfigurationHelper {
+
+	public function makeConnection($databaseConfig) {
+		
+	}
 
 	/**
 	 * Ensure that one of the database classes
@@ -202,5 +206,9 @@ class SQLiteDatabaseConfigurationHelper implements DatabaseConfigurationHelper {
 	 */
 	public static function secure_db_dir($path) {
 		return (is_writeable($path)) ? file_put_contents($path . '/.htaccess', 'deny from all') : false;
+	}
+
+	public function requireDatabaseAlterPermissions($databaseConfig) {
+		
 	}
 }
