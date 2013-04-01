@@ -19,6 +19,7 @@ Download, unzip and copy the sqlite3 folder to your project root so that it beco
 Either use the installer to automatically install SQLite or add this to your _config.php (right after "require_once("conf/ConfigureFromEnv.php");" if you are using _ss_environment.php)
 
 	$databaseConfig['type'] = 'SQLiteDatabase';
+	$databaseConfig['path'] = "/path/to/my/database/file";
 
 Make sure the webserver has sufficient privileges to write to that folder and that it is protected from external access.
 
