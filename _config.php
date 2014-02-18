@@ -8,9 +8,16 @@ if(defined('SS_DATABASE_CLASS') && in_array(SS_DATABASE_CLASS, $classes)) {
 }
 
 if(in_array($databaseConfig['type'], $classes)) {
-	if(empty($databaseConfig['path'])) $databaseConfig['path'] = defined('SS_SQLITE_DATABASE_PATH') && SS_SQLITE_DATABASE_PATH ? SS_SQLITE_DATABASE_PATH : ASSETS_PATH . '/.sqlitedb/';   // where to put the database file
+	if(empty($databaseConfig['path'])) {
+		// default the database path to a location in assets
+		$databaseConfig['path'] = defined('SS_SQLITE_DATABASE_PATH') && SS_SQLITE_DATABASE_PATH ? SS_SQLITE_DATABASE_PATH : ASSETS_PATH . '/.sqlitedb/';
+	}
+
 	$databaseConfig['database'] = (defined('SS_DATABASE_PREFIX') ? SS_DATABASE_PREFIX : '') . $databaseConfig['database'] . (defined('SS_DATABASE_SUFFIX') ? SS_DATABASE_SUFFIX : '');
-	if(empty($databaseConfig['key'])) $databaseConfig['key'] = defined('SS_SQLITE_DATABASE_KEY')  && SS_SQLITE_DATABASE_KEY  ? SS_SQLITE_DATABASE_KEY :  'SQLite3DatabaseKey';
+
+	if(empty($databaseConfig['key'])) {
+		$databaseConfig['key'] = defined('SS_SQLITE_DATABASE_KEY')  && SS_SQLITE_DATABASE_KEY  ? SS_SQLITE_DATABASE_KEY :  'SQLite3DatabaseKey';
+	}
 
 	/**
 	 * set pragma values on the connection.
