@@ -10,21 +10,16 @@ class SQLitePDODatabase extends SQLite3Database {
 	/*
 	 * Uses whatever connection details are in the $parameters array to connect to a database of a given name
 	 */
-	function connectDatabase(){
-
+	function connectDatabase() {
 		$this->enum_map = array();
-
-		$parameters=$this->parameters;
-
+		$parameters = $this->parameters;
 		$dbName = !isset($this->database) ? $parameters['database'] : $dbName=$this->database;
+		$file = $parameters['path'];
 
-		// use the very lightspeed SQLite In-Memory feature for testing
-		if((isset($parameters['memory']) && $parameters['memory']) || !isset($parameters['path'])) {
-			$file = ':memory:';
-			$this->lives_in_memory = true;
-		} else {
+		// assumes that the path to dbname will always be provided
+		// this is only necessary if we're using a filesystem path, and not an in-memory database
+		if($file != ':memory:') {
 			$file = $parameters['path'] . '/' . $dbName;
-			$this->lives_in_memory = false;
 			if(!file_exists($parameters['path'])) {
 				SQLiteDatabaseConfigurationHelper::create_db_dir($parameters['path']);
 				SQLiteDatabaseConfigurationHelper::secure_db_dir($parameters['path']);
@@ -33,8 +28,7 @@ class SQLitePDODatabase extends SQLite3Database {
 
 		$this->dbConn = new PDO("sqlite:$file");
 
-		//By virtue of getting here, the connection is active:
-		$this->active=true;
+		$this->active = true;
 		$this->database = $dbName;
 
 		if(!$this->dbConn) {
